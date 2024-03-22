@@ -68,6 +68,14 @@ export const getLayerMetadata = (
       },
       name: `request handler${layer.path ? ` - ${layerPath}` : ''}`,
     };
+  } else if (layer.name === 'handle'){
+    return {
+      attributes: {
+        [AttributeNames.EXPRESS_NAME]: layerPath ?? 'request handler',
+        [AttributeNames.EXPRESS_TYPE]: ExpressLayerType.REQUEST_HANDLER,
+      },
+      name: `request handler${layer.path ? ` - ${layerPath}` : ''}`,
+    };
   } else {
     return {
       attributes: {
