@@ -72,7 +72,7 @@ export class ExpressInstrumentation extends InstrumentationBase<
     return [
       new InstrumentationNodeModuleDefinition<typeof express>(
         'express',
-        ['^4.0.0'],
+        ['5.0.0-beta.1'],
         (moduleExports, moduleVersion) => {
           diag.debug(`Applying patch for express@${moduleVersion}`);
           const routerProto = moduleExports.Router as unknown as express.Router;
@@ -160,11 +160,11 @@ export class ExpressInstrumentation extends InstrumentationBase<
     const instrumentation = this;
     return function (original: express.Application['use']) {
       return function use(
-        this: { _router: ExpressRouter },
+        this: { router: ExpressRouter },
         ...args: Parameters<typeof original>
       ) {
         const route = original.apply(this, args);
-        const layer = this._router.stack[this._router.stack.length - 1];
+        const layer = this.router?.stack[this.router.stack.length - 1];
         instrumentation._applyPatch.call(
           instrumentation,
           layer,
