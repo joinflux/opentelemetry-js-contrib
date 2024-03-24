@@ -56,7 +56,7 @@ export class ExpressInstrumentation extends InstrumentationBase<
 > {
   constructor(config: ExpressInstrumentationConfig = {}) {
     super(
-      '@opentelemetry/instrumentation-express',
+      '@joinflux/instrumentation-express',
       VERSION,
       Object.assign({}, config)
     );
