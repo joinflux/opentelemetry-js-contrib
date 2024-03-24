@@ -284,18 +284,13 @@ export class ExpressInstrumentation extends InstrumentationBase<
           attributes: Object.assign(attributes, metadata.attributes),
         });
 
-        if (instrumentation.getConfig().requestHook) {
+        const requestHook = instrumentation.getConfig().requestHook;
+        if (requestHook !== undefined) {
           safeExecuteInTheMiddle(
-            () =>
-              instrumentation.getConfig().requestHook!(span, {
-                request: req,
-                layerType: type,
-                route,
-              }),
+            () => requestHook(span, { request: req, layerType: type, route }),
             e => {
-              if (e) {
+              if (e)
                 diag.error('express instrumentation: request hook failed', e);
-              }
             },
             true
           );
