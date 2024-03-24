@@ -48,6 +48,8 @@ import {
   _LAYERS_STORE_PROPERTY,
 } from './internal-types';
 
+const methods = ['get', 'post', 'put', 'patch', 'delete'] as const;
+
 /** Express instrumentation for OpenTelemetry */
 export class ExpressInstrumentation extends InstrumentationBase<
   typeof express
@@ -75,7 +77,8 @@ export class ExpressInstrumentation extends InstrumentationBase<
         ['5.0.0-beta.1'],
         (moduleExports, moduleVersion) => {
           diag.debug(`Applying patch for express@${moduleVersion}`);
-          const routerProto = moduleExports.Router as unknown as express.Router;
+          const routerProto = moduleExports.Router
+            .prototype as unknown as express.Router;
           // patch express.Router.route
           if (isWrapped(routerProto.route)) {
             this._unwrap(routerProto, 'route');
@@ -87,6 +90,19 @@ export class ExpressInstrumentation extends InstrumentationBase<
           }
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           this._wrap(routerProto, 'use', this._getRouterUsePatch() as any);
+
+          // patch express.Router.[get|post|put|patch|delete]
+          methods.forEach(method => {
+            if (isWrapped(routerProto[method])) {
+              this._unwrap(routerProto, method);
+            }
+            this._wrap(
+              routerProto,
+              method,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              this._getRouteMethodPatch(method) as any
+            );
+          });
           // patch express.Application.use
           if (isWrapped(moduleExports.application.use)) {
             this._unwrap(moduleExports.application, 'use');
@@ -102,13 +118,42 @@ export class ExpressInstrumentation extends InstrumentationBase<
         (moduleExports, moduleVersion) => {
           if (moduleExports === undefined) return;
           diag.debug(`Removing patch for express@${moduleVersion}`);
-          const routerProto = moduleExports.Router as unknown as express.Router;
+          const routerProto = moduleExports.Router
+            .prototype as unknown as express.Router;
           this._unwrap(routerProto, 'route');
           this._unwrap(routerProto, 'use');
+          methods.forEach(method => this._unwrap(routerProto, method));
           this._unwrap(moduleExports.application, 'use');
         }
       ),
     ];
+  }
+  /**
+   * Get the patch for Router.[get|post|put|patch|delete] function
+   */
+  private _getRouteMethodPatch(method: (typeof methods)[number]) {
+    const instrumentation = this;
+    return function (original: express.Router[typeof method]) {
+      return function method_trace(
+        this: ExpressRouter,
+        ...args: Parameters<typeof original>
+      ) {
+        // if there are more than 2 args, it means that we have some inline middlewares
+        if (args.length > 2) {
+          for (let i = 1; i < args.length - 1; i++) {
+            diag.debug('(unimplemented) route middleware', args[i]);
+            // TODO: Path this middleware to add tracing, but how?
+          }
+        }
+        const fn = original.apply(this, args);
+        const layer = this.stack[this.stack.length - 1] as ExpressLayer;
+        instrumentation._applyPatch(
+          layer,
+          typeof args[0] === 'string' ? args[0] : undefined
+        );
+        return fn;
+      };
+    };
   }
 
   /**
@@ -186,6 +231,7 @@ export class ExpressInstrumentation extends InstrumentationBase<
     if (layer[kLayerPatched] === true) return;
     layer[kLayerPatched] = true;
 
+    // eslint-disable-next-line @typescript-eslint/ban-types
     this._wrap(layer, 'handle', (original: Function) => {
       // TODO: instrument error handlers
       if (original.length === 4) return original;
