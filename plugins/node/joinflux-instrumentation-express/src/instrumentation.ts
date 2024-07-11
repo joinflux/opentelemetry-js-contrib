@@ -67,8 +67,9 @@ export class ExpressInstrumentation extends InstrumentationBase {
     return [
       new InstrumentationNodeModuleDefinition(
         'express',
-        ['>=4.0.0 <5'],
-        moduleExports => {
+        ['5.0.0-beta.1'],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (moduleExports: any) => {
           const routerProto = moduleExports.Router as unknown as express.Router;
           // patch express.Router.route
           if (isWrapped(routerProto.route)) {
